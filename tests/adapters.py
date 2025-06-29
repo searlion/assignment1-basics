@@ -610,14 +610,22 @@ def run_train_bpe(
     # --- 2. Parallel Pre-tokenization and Word Counting ---
     print("Starting parallel pre-tokenization and counting...")
     num_processes = multiprocessing.cpu_count()
-    split_token_for_chunking = b"<|endoftext|>"  # A sensible choice for document splitting
+
+    # Use the first special token as the boundary for file chunking.
+    # This is a reasonable heuristic. If no special tokens, chunking is approximate.
+    split_token_for_chunking = special_tokens[0].encode("utf-8") if special_tokens else b'\n'
 
     with open(input_path, "rb") as f:
         boundaries = find_chunk_boundaries(f, num_processes, split_token_for_chunking)
 
-    chunk_args = [(str(input_path), start, end, unicode_map) for start, end in zip(boundaries[:-1], boundaries[1:])]
+    # Pass special_tokens to the worker arguments
+    chunk_args = [
+        (str(input_path), start, end, unicode_map, special_tokens)
+        for start, end in zip(boundaries[:-1], boundaries[1:])
+    ]
 
     word_counts: Counter[tuple[str, ...]] = Counter()
+
     with multiprocessing.Pool(num_processes) as pool:
         results = pool.starmap(_process_chunk, chunk_args)
         for result_counter in results:
