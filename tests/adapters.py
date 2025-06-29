@@ -626,13 +626,6 @@ def run_train_bpe(
         for result_counter in results: word_counts.update(result_counter)
     print(f"Finished pre-tokenization. Found {len(word_counts)} unique pre-tokens.")
 
-    # --- OPTIMIZATION: Pre-calculate pair stats once before the loop ---
-    print("Pre-calculating initial pair statistics...")
-    pair_stats = Counter()
-    for word, count in word_counts.items():
-        for i in range(len(word) - 1):
-            pair_stats[word[i], word[i+1]] += count
-
     # 3. The Iterative Merging Loop
     num_merges = vocab_size - len(vocab)
     print(f"Starting {num_merges} BPE merge operations...")
