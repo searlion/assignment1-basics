@@ -594,97 +594,81 @@ def run_train_bpe(
                 Merges are ordered by order of creation.
     """
     # --- 1. Setup and Initial Vocabulary ---
-    assert vocab_size >= 256 + len(special_tokens), "Vocab size is too small!"
+    assert vocab_size >= 256 + len(special_tokens)
 
-    # These maps are for internal processing using nice, printable strings
+    # 1. Setup
     unicode_map = gpt2_bytes_to_unicode()
-    unicode_to_bytes_map = {v: k for k, v in unicode_map.items()}
 
-    # This is the final vocabulary and merges to be returned, using raw bytes
+    # --- THE FIX: Create and maintain a string-to-byte mapping ---
+    str_to_bytes_map = {v: bytes([k]) for k, v in unicode_map.items()}
+
+    # 2. Initial Vocab and Word Counts
     vocab: dict[int, bytes] = {i: bytes([i]) for i in range(256)}
     for i, token_str in enumerate(special_tokens):
-        vocab[256 + i] = token_str.encode("utf-8")
+        token_bytes = token_str.encode("utf-8")
+        vocab[256 + i] = token_bytes
+        # Add special tokens to our string-to-byte map as well
+        str_to_bytes_map[token_str] = token_bytes
 
     merges: list[tuple[bytes, bytes]] = []
 
-    # --- 2. Parallel Pre-tokenization and Word Counting ---
+    # Parallel Pre-tokenization (This part is correct)
     print("Starting parallel pre-tokenization and counting...")
     num_processes = multiprocessing.cpu_count()
-
-    # Use the first special token as the boundary for file chunking.
-    # This is a reasonable heuristic. If no special tokens, chunking is approximate.
     split_token_for_chunking = special_tokens[0].encode("utf-8") if special_tokens else b'\n'
-
     with open(input_path, "rb") as f:
         boundaries = find_chunk_boundaries(f, num_processes, split_token_for_chunking)
-
-    # Pass special_tokens to the worker arguments
-    chunk_args = [
-        (str(input_path), start, end, unicode_map, special_tokens)
-        for start, end in zip(boundaries[:-1], boundaries[1:])
-    ]
-
+    chunk_args = [(str(input_path), start, end, unicode_map, special_tokens) for start, end in
+                  zip(boundaries[:-1], boundaries[1:])]
     word_counts: Counter[tuple[str, ...]] = Counter()
-
     with multiprocessing.Pool(num_processes) as pool:
         results = pool.starmap(_process_chunk, chunk_args)
-        for result_counter in results:
-            word_counts.update(result_counter)
-
+        for result_counter in results: word_counts.update(result_counter)
     print(f"Finished pre-tokenization. Found {len(word_counts)} unique pre-tokens.")
 
-    # --- 3. The Iterative Merging Loop ---
+    # 3. The Iterative Merging Loop
     num_merges = vocab_size - len(vocab)
     print(f"Starting {num_merges} BPE merge operations...")
 
     for i in tqdm(range(num_merges), desc="BPE Merges"):
         pair_stats = _get_pair_stats(word_counts)
         if not pair_stats:
-            print("No more pairs to merge. Stopping early.")
             break
 
-        # Find the most frequent pair. Tie-breaking is done lexicographically.
-        best_pair = max(pair_stats.keys(), key=lambda p: (pair_stats[p], p))
+        # Tie-breaking logic (this was always correct)
+        best_pair = max(
+            pair_stats,
+            key=lambda p: (pair_stats[p], str_to_bytes_map[p[0]], str_to_bytes_map[p[1]]),
+        )
 
-        # Create the new merged token (as a printable string for now)
-        new_token_str = "".join(best_pair)
+        # --- THE FIX in action ---
+        # Use the str_to_bytes_map to correctly get the byte representation of the pair
+        part1_bytes = str_to_bytes_map[best_pair[0]]
+        part2_bytes = str_to_bytes_map[best_pair[1]]
 
-        # --- Update vocab and merges with RAW BYTES ---
-        # Convert the nice string pair back to the required byte format for the output
-        # --- [START] CORRECTED LOGIC FOR BYTE CONVERSION ---
-
-        # Convert the first part of the pair (a printable string) back to its original bytes
-        part1_bytes = bytes([unicode_to_bytes_map[char] for char in best_pair[0]])
-
-        # Convert the second part of the pair
-        part2_bytes = bytes([unicode_to_bytes_map[char] for char in best_pair[1]])
-
-        # Now add the correct bytes to the merges list and vocab
+        # Add the correct bytes to the final merges list
         merges.append((part1_bytes, part2_bytes))
-        vocab[len(vocab)] = part1_bytes + part2_bytes
 
-        # --- [END] CORRECTED LOGIC ---
+        # Create the new token and update all our mappings
+        new_token_str = "".join(best_pair)
+        new_token_bytes = part1_bytes + part2_bytes
+        vocab[len(vocab)] = new_token_bytes
+        str_to_bytes_map[new_token_str] = new_token_bytes
 
-        # Replace your complex loop with this simpler, more robust one.
-        new_word_counts: Counter[tuple[str, ...]] = Counter()
+        # The robust merge-and-replace logic
+        new_word_counts = Counter()
         for word_tuple, count in word_counts.items():
-            i = 0
+            j = 0
             new_word = []
-            while i < len(word_tuple):
-                # Check for a match at the current position
-                if i < len(word_tuple) - 1 and (word_tuple[i], word_tuple[i + 1]) == best_pair:
-                    # If it matches, append the new merged token and skip ahead by 2
+            while j < len(word_tuple):
+                if j < len(word_tuple) - 1 and (word_tuple[j], word_tuple[j + 1]) == best_pair:
                     new_word.append(new_token_str)
-                    i += 2
+                    j += 2
                 else:
-                    # If no match, just copy the current token and advance by 1
-                    new_word.append(word_tuple[i])
-                    i += 1
-            # Add the newly formed word to the new counter
+                    new_word.append(word_tuple[j])
+                    j += 1
             new_word_counts[tuple(new_word)] += count
-
         word_counts = new_word_counts
 
     print("BPE training complete.")
     return vocab, merges
-
