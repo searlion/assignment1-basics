@@ -1,10 +1,8 @@
-import re
+import regex as re
 from typing import Counter
 
-# Modified pre-tokenization regex pattern compatible with Python's re module
-# \p{L} -> [a-zA-ZÀ-ÿĀ-žА-я一-龯] (covers most common Unicode letter ranges)
-# \p{N} -> [0-9] (covers ASCII digits)
-PAT = r"""'(?:[sdmt]|ll|ve|re)| ?[a-zA-ZÀ-ÿĀ-žА-я一-龯]+| ?[0-9]+| ?[^\s\w]+|\s+(?!\S)|\s+"""
+# Use the EXACT pattern from the assignment PDF
+PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
 
 def _get_pair_stats(word_counts: Counter[tuple[str, ...]]) -> Counter[tuple[str, str]]:
     """Helper to count adjacent pairs from the word frequency map."""
@@ -48,6 +46,7 @@ def _process_chunk(
         if not text_part:
             continue
 
+        # This will now use the correct regex engine and pattern
         pre_tokens = re.findall(PAT, text_part)
 
         for pre_token in pre_tokens:

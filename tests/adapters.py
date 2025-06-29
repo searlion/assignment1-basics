@@ -665,24 +665,24 @@ def run_train_bpe(
 
         # --- [END] CORRECTED LOGIC ---
 
-        # --- Perform the merge in our word_counts data structure ---
+        # Replace your complex loop with this simpler, more robust one.
         new_word_counts: Counter[tuple[str, ...]] = Counter()
         for word_tuple, count in word_counts.items():
             i = 0
             new_word = []
             while i < len(word_tuple):
-                # Check for the best_pair starting at the current position
-                if i < len(word_tuple) - 1 and word_tuple[i] == best_pair[0] and word_tuple[i + 1] == best_pair[1]:
-                    # Found the pair, append the new merged token
+                # Check for a match at the current position
+                if i < len(word_tuple) - 1 and (word_tuple[i], word_tuple[i + 1]) == best_pair:
+                    # If it matches, append the new merged token and skip ahead by 2
                     new_word.append(new_token_str)
-                    i += 2  # Skip over the two tokens we just merged
+                    i += 2
                 else:
-                    # Did not find the pair, just append the current token
+                    # If no match, just copy the current token and advance by 1
                     new_word.append(word_tuple[i])
                     i += 1
-            # Add the newly formed word to our new counts
+            # Add the newly formed word to the new counter
             new_word_counts[tuple(new_word)] += count
-        # Update the main counts with the new merged counts
+
         word_counts = new_word_counts
 
     print("BPE training complete.")
