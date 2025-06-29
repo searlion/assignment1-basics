@@ -12,6 +12,7 @@ from torch import Tensor
 from tqdm import tqdm
 
 from cs336_basics.pretokenization_example import find_chunk_boundaries
+from cs336_basics.tokenizer import Tokenizer
 from cs336_basics.train_bpe_helper import _process_chunk, _get_pair_stats
 from tests.common import gpt2_bytes_to_unicode
 
@@ -563,7 +564,7 @@ def get_tokenizer(
     Returns:
         A BPE tokenizer that uses the provided vocab, merges, and special tokens.
     """
-    raise NotImplementedError
+    return Tokenizer(vocab=vocab, merges=merges, special_tokens=special_tokens)
 
 
 def run_train_bpe(
@@ -600,6 +601,7 @@ def run_train_bpe(
     unicode_map = gpt2_bytes_to_unicode()
 
     # --- THE FIX: Create and maintain a string-to-byte mapping ---
+    ## purpose: for tie-breaking on the original byte values and construct the final output
     str_to_bytes_map = {v: bytes([k]) for k, v in unicode_map.items()}
 
     # 2. Initial Vocab and Word Counts
@@ -615,6 +617,8 @@ def run_train_bpe(
     # Parallel Pre-tokenization (This part is correct)
     print("Starting parallel pre-tokenization and counting...")
     num_processes = multiprocessing.cpu_count()
+    ## To split a large file for parallel processing, we can't just cut it at arbitrary byte positions (we might split a multi-byte character in half).
+    ## Using a document separator like <|endoftext|> or a line break (\n) is a smart heuristic to ensure chunks start and end at meaningful places.
     split_token_for_chunking = special_tokens[0].encode("utf-8") if special_tokens else b'\n'
     with open(input_path, "rb") as f:
         boundaries = find_chunk_boundaries(f, num_processes, split_token_for_chunking)
@@ -631,11 +635,15 @@ def run_train_bpe(
     print(f"Starting {num_merges} BPE merge operations...")
 
     for i in tqdm(range(num_merges), desc="BPE Merges"):
+        ## This counts the frequency of each pair of tokens
         pair_stats = _get_pair_stats(word_counts)
         if not pair_stats:
             break
 
         # Tie-breaking logic (this was always correct)
+        # Logic: first compare frequency
+        # If frequency tie, compare first token of the pair
+        # If still tie, compare second token of the pair
         best_pair = max(
             pair_stats,
             key=lambda p: (pair_stats[p], str_to_bytes_map[p[0]], str_to_bytes_map[p[1]]),
@@ -657,8 +665,17 @@ def run_train_bpe(
 
         # --- OPTIMIZATION: The incremental update logic ---
         # Find only the words that are affected by this merge
+        # By using a set, we are looking only at unique words to update, not how many times they appear (in word_counts)
+        # Note that this is an imperfect filter as it does not take into account ordering of the tokens
+        ## This is a classic engineering trade-off between perfect filtering and "good enough: filtering for the sake of speed
+        ## While there are false positives, these will be handled in the next stage of code
         words_to_update = {word for word in word_counts if best_pair[0] in word and best_pair[1] in word}
 
+        # words_to_update: The small set of candidate words that might contain our best_pair.
+        # best_pair: The pair we are merging, e.g., ('t', 'h').
+        # new_token_str: The string for the new token, e.g., 'th'.
+        # word_counts: The master dictionary of word_tuple -> frequency.
+        # pair_stats: The master dictionary of pair_tuple -> frequency.
         for word in words_to_update:
             count = word_counts[word]
             j = 0
