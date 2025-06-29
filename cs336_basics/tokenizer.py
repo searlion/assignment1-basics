@@ -105,7 +105,7 @@ class Tokenizer:
 
     def _get_pairs(self, parts: List[bytes]) -> set:
         """Helper to get all adjacent pairs from a list of token parts."""
-        return set(zip(parts, parts[1:]))
+        return set(zip(parts[:-1], parts[1:]))
 
     # Purpose: It takes a single chunk of bytes (representing one "pre-token" like b"testing")
     # and applies the merge rules iteratively until no more merges are possible.
@@ -130,6 +130,7 @@ class Tokenizer:
             # Find the best pair to merge (the one with the lowest rank/priority)
             # The .get(p, float("inf")) is a clever trick: if a pair is not in our merge rules, it gets a rank of infinity,
             # ensuring it will never be chosen as the minimum.
+            # The first learned pair --> highest priority. And this pair has the smallest index
             best_pair = min(pairs, key=lambda p: self.bpe_ranks.get(p, float("inf")))
 
             # If no pairs are in our merge list, we're done with this token.
