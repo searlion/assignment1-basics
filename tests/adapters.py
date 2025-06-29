@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import multiprocessing
 import os
-from typing import IO, Any, BinaryIO
+from typing import IO, Any, BinaryIO, Counter
 from collections.abc import Iterable
 from jaxtyping import Float, Int
 
 import numpy.typing as npt
 import torch
 from torch import Tensor
+from tqdm import tqdm
 
+from cs336_basics.pretokenization_example import find_chunk_boundaries
+from cs336_basics.train_bpe_helper import _process_chunk, _get_pair_stats
+from tests.common import gpt2_bytes_to_unicode
 
 
 def run_linear(
@@ -588,5 +593,90 @@ def run_train_bpe(
                 representing that <token1> was merged with <token2>.
                 Merges are ordered by order of creation.
     """
+    # --- 1. Setup and Initial Vocabulary ---
+    assert vocab_size >= 256 + len(special_tokens), "Vocab size is too small!"
 
-    raise NotImplementedError
+    # These maps are for internal processing using nice, printable strings
+    unicode_map = gpt2_bytes_to_unicode()
+    unicode_to_bytes_map = {v: k for k, v in unicode_map.items()}
+
+    # This is the final vocabulary and merges to be returned, using raw bytes
+    vocab: dict[int, bytes] = {i: bytes([i]) for i in range(256)}
+    for i, token_str in enumerate(special_tokens):
+        vocab[256 + i] = token_str.encode("utf-8")
+
+    merges: list[tuple[bytes, bytes]] = []
+
+    # --- 2. Parallel Pre-tokenization and Word Counting ---
+    print("Starting parallel pre-tokenization and counting...")
+    num_processes = multiprocessing.cpu_count()
+    split_token_for_chunking = b"<|endoftext|>"  # A sensible choice for document splitting
+
+    with open(input_path, "rb") as f:
+        boundaries = find_chunk_boundaries(f, num_processes, split_token_for_chunking)
+
+    chunk_args = [(str(input_path), start, end, unicode_map) for start, end in zip(boundaries[:-1], boundaries[1:])]
+
+    word_counts: Counter[tuple[str, ...]] = Counter()
+    with multiprocessing.Pool(num_processes) as pool:
+        results = pool.starmap(_process_chunk, chunk_args)
+        for result_counter in results:
+            word_counts.update(result_counter)
+
+    print(f"Finished pre-tokenization. Found {len(word_counts)} unique pre-tokens.")
+
+    # --- 3. The Iterative Merging Loop ---
+    num_merges = vocab_size - len(vocab)
+    print(f"Starting {num_merges} BPE merge operations...")
+
+    for i in tqdm(range(num_merges), desc="BPE Merges"):
+        pair_stats = _get_pair_stats(word_counts)
+        if not pair_stats:
+            print("No more pairs to merge. Stopping early.")
+            break
+
+        # Find the most frequent pair. Tie-breaking is done lexicographically.
+        best_pair = max(pair_stats.keys(), key=lambda p: (pair_stats[p], p))
+
+        # Create the new merged token (as a printable string for now)
+        new_token_str = "".join(best_pair)
+
+        # --- Update vocab and merges with RAW BYTES ---
+        # Convert the nice string pair back to the required byte format for the output
+        # --- [START] CORRECTED LOGIC FOR BYTE CONVERSION ---
+
+        # Convert the first part of the pair (a printable string) back to its original bytes
+        part1_bytes = bytes([unicode_to_bytes_map[char] for char in best_pair[0]])
+
+        # Convert the second part of the pair
+        part2_bytes = bytes([unicode_to_bytes_map[char] for char in best_pair[1]])
+
+        # Now add the correct bytes to the merges list and vocab
+        merges.append((part1_bytes, part2_bytes))
+        vocab[len(vocab)] = part1_bytes + part2_bytes
+
+        # --- [END] CORRECTED LOGIC ---
+
+        # --- Perform the merge in our word_counts data structure ---
+        new_word_counts: Counter[tuple[str, ...]] = Counter()
+        for word_tuple, count in word_counts.items():
+            i = 0
+            new_word = []
+            while i < len(word_tuple):
+                # Check for the best_pair starting at the current position
+                if i < len(word_tuple) - 1 and word_tuple[i] == best_pair[0] and word_tuple[i + 1] == best_pair[1]:
+                    # Found the pair, append the new merged token
+                    new_word.append(new_token_str)
+                    i += 2  # Skip over the two tokens we just merged
+                else:
+                    # Did not find the pair, just append the current token
+                    new_word.append(word_tuple[i])
+                    i += 1
+            # Add the newly formed word to our new counts
+            new_word_counts[tuple(new_word)] += count
+        # Update the main counts with the new merged counts
+        word_counts = new_word_counts
+
+    print("BPE training complete.")
+    return vocab, merges
+
