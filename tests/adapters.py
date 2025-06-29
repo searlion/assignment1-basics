@@ -626,6 +626,13 @@ def run_train_bpe(
         for result_counter in results: word_counts.update(result_counter)
     print(f"Finished pre-tokenization. Found {len(word_counts)} unique pre-tokens.")
 
+    # --- OPTIMIZATION: Pre-calculate pair stats once before the loop ---
+    print("Pre-calculating initial pair statistics...")
+    pair_stats = Counter()
+    for word, count in word_counts.items():
+        for i in range(len(word) - 1):
+            pair_stats[word[i], word[i+1]] += count
+
     # 3. The Iterative Merging Loop
     num_merges = vocab_size - len(vocab)
     print(f"Starting {num_merges} BPE merge operations...")
@@ -642,7 +649,7 @@ def run_train_bpe(
         )
 
         # --- THE FIX in action ---
-        # Use the str_to_bytes_map to correctly get the byte representation of the pair
+        # Use the str_to_bytes_map to correctly get the byte representation of Found {len(word_counts)} unique pre-tokens.the pair
         part1_bytes = str_to_bytes_map[best_pair[0]]
         part2_bytes = str_to_bytes_map[best_pair[1]]
 
@@ -655,20 +662,42 @@ def run_train_bpe(
         vocab[len(vocab)] = new_token_bytes
         str_to_bytes_map[new_token_str] = new_token_bytes
 
-        # The robust merge-and-replace logic
-        new_word_counts = Counter()
-        for word_tuple, count in word_counts.items():
+        # --- OPTIMIZATION: The incremental update logic ---
+        # Find only the words that are affected by this merge
+        words_to_update = {word for word in word_counts if best_pair[0] in word and best_pair[1] in word}
+
+        for word in words_to_update:
+            count = word_counts[word]
             j = 0
             new_word = []
-            while j < len(word_tuple):
-                if j < len(word_tuple) - 1 and (word_tuple[j], word_tuple[j + 1]) == best_pair:
+
+            # This loop creates the new version of the word
+            while j < len(word):
+                if j < len(word) - 1 and (word[j], word[j + 1]) == best_pair:
+                    # Decrement stats for pairs being destroyed by the merge
+                    if j > 0:
+                        pair_stats[word[j - 1], word[j]] -= count
+                    if j < len(word) - 2:
+                        pair_stats[word[j + 1], word[j + 2]] -= count
+
                     new_word.append(new_token_str)
                     j += 2
                 else:
-                    new_word.append(word_tuple[j])
+                    new_word.append(word[j])
                     j += 1
-            new_word_counts[tuple(new_word)] += count
-        word_counts = new_word_counts
+
+            new_word_tuple = tuple(new_word)
+
+            # Update word_counts: remove the old word, add the new one
+            del word_counts[word]
+            word_counts[new_word_tuple] += count
+
+            # Increment stats for newly created pairs
+            for k in range(len(new_word_tuple) - 1):
+                pair_stats[new_word_tuple[k], new_word_tuple[k + 1]] += count
+
+        # Clean up the pair we just merged
+        del pair_stats[best_pair]
 
     print("BPE training complete.")
     return vocab, merges
