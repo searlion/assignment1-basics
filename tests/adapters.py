@@ -11,9 +11,12 @@ import torch
 from torch import Tensor
 from tqdm import tqdm
 
+from cs336_basics.linear import Linear
 from cs336_basics.pretokenization_example import find_chunk_boundaries
+from cs336_basics.rmsnorm import RMSNorm
 from cs336_basics.tokenizer import Tokenizer
 from cs336_basics.train_bpe_helper import _process_chunk, _get_pair_stats
+from embedding import Embedding
 from tests.common import gpt2_bytes_to_unicode
 
 
@@ -35,8 +38,25 @@ def run_linear(
     Returns:
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
+    # 1. Instantiate your custom Linear module with the given dimensions.
+    # The device and dtype of the weights and input features will be inferred.
+    device = weights.device
+    dtype = weights.dtype
+    linear_module = Linear(in_features=d_in, out_features=d_out, device=device, dtype=dtype)
 
-    raise NotImplementedError
+    # 2. Prepare the state dictionary for loading. The key 'W' must match
+    #    the name of the parameter in your Linear class (self.W).
+    state_dict_to_load = {"W": weights}
+
+    # 3. Load the provided weights into your module instance.
+    #    This is a key method provided by the nn.Module base class.
+    linear_module.load_state_dict(state_dict_to_load)
+
+    # 4. Apply the linear transformation by calling the module.
+    #    This invokes the forward() method of your linear_module.
+    output = linear_module(in_features)
+
+    return output
 
 
 def run_embedding(
@@ -57,8 +77,12 @@ def run_embedding(
     Returns:
         Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
     """
-
-    raise NotImplementedError
+    device = weights.device
+    dtype = weights.dtype
+    embedding_module = Embedding(vocab_size, d_model, device=device, dtype=dtype)
+    embedding_module.load_state_dict({"weight": weights})
+    output = embedding_module(token_ids)
+    return output
 
 
 def run_swiglu(
@@ -385,7 +409,25 @@ def run_rmsnorm(
         Float[Tensor,"... d_model"]: Tensor of with the same shape as `in_features` with the output of running
         RMSNorm of the `in_features`.
     """
-    raise NotImplementedError
+    # 1. Instantiate your custom Linear module with the given dimensions.
+    # The device and dtype of the weights and input features will be inferred.
+    device = weights.device
+    dtype = weights.dtype
+    rms_norm = RMSNorm(d_model=d_model, eps=eps, device=device, dtype=dtype)
+
+    # 2. Prepare the state dictionary for loading. The key 'W' must match
+    #    the name of the parameter in your Linear class (self.W).
+    state_dict_to_load = {"g": weights}
+
+    # 3. Load the provided weights into your module instance.
+    #    This is a key method provided by the nn.Module base class.
+    rms_norm.load_state_dict(state_dict_to_load)
+
+    # 4. Apply the linear transformation by calling the module.
+    #    This invokes the forward() method of your linear_module.
+    output = rms_norm(in_features)
+
+    return output
 
 
 def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
