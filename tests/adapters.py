@@ -12,8 +12,10 @@ from torch import Tensor
 from tqdm import tqdm
 
 from cs336_basics.linear import Linear
+from cs336_basics.positionwise_feedforward import PositionwiseFeedForward
 from cs336_basics.pretokenization_example import find_chunk_boundaries
 from cs336_basics.rmsnorm import RMSNorm
+from cs336_basics.rope import RotaryPositionalEmbedding
 from cs336_basics.tokenizer import Tokenizer
 from cs336_basics.train_bpe_helper import _process_chunk, _get_pair_stats
 from embedding import Embedding
@@ -107,14 +109,21 @@ def run_swiglu(
     Returns:
         Float[Tensor, "... d_model"]: Output embeddings of the same shape as the input embeddings.
     """
-    # Example:
-    # If your state dict keys match, you can use `load_state_dict()`
-    # swiglu.load_state_dict(weights)
-    # You can also manually assign the weights
-    # swiglu.w1.weight.data = w1_weight
-    # swiglu.w2.weight.data = w2_weight
-    # swiglu.w3.weight.data = w3_weight
-    raise NotImplementedError
+    # 1. Instantiate our feed-forward network with the specified dimensions.
+    swiglu_ffn = PositionwiseFeedForward(d_model=d_model, d_ff=d_ff)
+
+    # 2. Manually load the provided weights into the model's layers.
+    # We use torch.no_grad() to perform these operations without tracking gradients.
+    # .copy_() is an in-place operation that is robust for this task.
+    with torch.no_grad():
+        swiglu_ffn.gate_proj.weight.copy_(w1_weight)
+        swiglu_ffn.down_proj.weight.copy_(w2_weight)
+        swiglu_ffn.up_proj.weight.copy_(w3_weight)
+
+    # 3. Run the forward pass with the input features.
+    output = swiglu_ffn(in_features)
+
+    return output
 
 
 def run_scaled_dot_product_attention(
@@ -231,7 +240,9 @@ def run_rope(
     Returns:
         Float[Tensor, " ... sequence_length d_k"]: Tensor with RoPEd input.
     """
-    raise NotImplementedError
+    rope = RotaryPositionalEmbedding(theta, d_k, max_seq_len)
+    result = rope(in_query_or_key, token_positions)
+    return result
 
 
 def run_transformer_block(
