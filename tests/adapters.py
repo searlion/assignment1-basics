@@ -25,6 +25,7 @@ from cs336_basics.softmax import softmax
 from cs336_basics.tokenizer import Tokenizer
 from cs336_basics.train_bpe_helper import _process_chunk, _get_pair_stats
 from cs336_basics.transformer_block import TransformerBlock
+from cs336_basics.transformer_lm import TransformerLM
 from embedding import Embedding
 from tests.common import gpt2_bytes_to_unicode
 
@@ -503,7 +504,52 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    raise NotImplementedError
+    # Instantiate the full language model.
+    model = TransformerLM(
+        vocab_size=vocab_size,
+        context_length=context_length,
+        d_model=d_model,
+        num_layers=num_layers,
+        num_heads=num_heads,
+        d_ff=d_ff,
+        rope_theta=rope_theta,
+    )
+
+    # Create a new state dictionary by mapping the provided weight keys
+    # to the parameter names in our model implementation.
+    state_dict = {}
+    state_dict["token_embeddings.weight"] = weights["token_embeddings.weight"]
+    state_dict["ln_final.g"] = weights["ln_final.weight"]
+    state_dict["lm_head.W"] = weights["lm_head.weight"]
+
+    for i in range(num_layers):
+        layer_prefix = f"layers.{i}"
+        # Attention block weights
+        state_dict[f"{layer_prefix}.attn.q_proj.weight"] = weights[f"{layer_prefix}.attn.q_proj.weight"]
+        state_dict[f"{layer_prefix}.attn.k_proj.weight"] = weights[f"{layer_prefix}.attn.k_proj.weight"]
+        state_dict[f"{layer_prefix}.attn.v_proj.weight"] = weights[f"{layer_prefix}.attn.v_proj.weight"]
+        state_dict[f"{layer_prefix}.attn.output_proj.weight"] = weights[f"{layer_prefix}.attn.output_proj.weight"]
+        # FFN block weights (mapping w1, w2, w3 to our names)
+        state_dict[f"{layer_prefix}.ffn.gate_proj.weight"] = weights[f"{layer_prefix}.ffn.w1.weight"]
+        state_dict[f"{layer_prefix}.ffn.up_proj.weight"] = weights[f"{layer_prefix}.ffn.w3.weight"]
+        state_dict[f"{layer_prefix}.ffn.down_proj.weight"] = weights[f"{layer_prefix}.ffn.w2.weight"]
+        # Normalization block weights (mapping .weight to .g)
+        state_dict[f"{layer_prefix}.ln1.g"] = weights[f"{layer_prefix}.ln1.weight"]
+        state_dict[f"{layer_prefix}.ln2.g"] = weights[f"{layer_prefix}.ln2.weight"]
+
+    # Load the remapped weights into the model.
+    model.load_state_dict(state_dict)
+
+    # Move model to the correct device and set to evaluation mode.
+    device = in_indices.device
+    model.to(device)
+    model.eval()
+
+    # Perform the forward pass without tracking gradients.
+    with torch.no_grad():
+        output = model(in_indices)
+
+    return output
 
 
 def run_rmsnorm(
