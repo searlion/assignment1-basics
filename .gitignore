@@ -5,6 +5,7 @@ __pycache__/
 
 /data
 /.idea
+/tokenizers
 # C extensions
 *.so
 
