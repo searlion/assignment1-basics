@@ -16,6 +16,7 @@ from tqdm import tqdm
 
 from cs336_basics.adamw import AdamW
 from cs336_basics.cross_entropy import cross_entropy
+from cs336_basics.data_loader import data_loader
 from cs336_basics.gradient_clipping import gradient_clipping
 from cs336_basics.learning_rate_scheduler import learning_rate_scheduler
 from cs336_basics.linear import Linear
@@ -631,7 +632,7 @@ def run_get_batch(
         is the sampled input sequences, and the second tuple item is the corresponding
         language modeling labels.
     """
-    raise NotImplementedError
+    return data_loader(dataset, batch_size, context_length, device)
 
 
 def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, " ..."]:
