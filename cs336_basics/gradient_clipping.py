@@ -25,7 +25,7 @@ def gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: flo
     # 2. Compute the total l2-norm of all gradients combined.
     # A memory-efficient way is to sum the squared norms of each grad tensor
     # and then take the square root of the total sum.
-    total_norm = torch.sqrt(sum(torch.sum(g.pow(2)) for g in grads))
+    total_norm = torch.sqrt(torch.sum(torch.stack([torch.sum(g.pow(2)) for g in grads])))
 
     # 3. Check if clipping is needed. If the norm is already within the limit, do nothing.
     if total_norm <= max_l2_norm:
