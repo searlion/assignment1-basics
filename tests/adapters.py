@@ -730,7 +730,16 @@ def run_save_checkpoint(
             we've completed.
         out (str | os.PathLike | BinaryIO | IO[bytes]): Path or file-like object to serialize the model, optimizer, and iteration to.
     """
-    raise NotImplementedError
+    # We'll save all the necessary information in a single dictionary.
+    # This is a robust and common pattern for checkpointing.
+    checkpoint_data = {
+        "model_state_dict": model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "iteration": iteration,
+    }
+
+    # torch.save serializes this dictionary to the specified path or file object.
+    torch.save(checkpoint_data, out)
 
 
 def run_load_checkpoint(
@@ -751,7 +760,18 @@ def run_load_checkpoint(
     Returns:
         int: the previously-serialized number of iterations.
     """
-    raise NotImplementedError
+    # Load the entire checkpoint dictionary from the source.
+    # Using map_location='cpu' ensures the checkpoint can be loaded on any machine,
+    # regardless of whether it has a GPU or if the checkpoint was saved on one.
+    checkpoint = torch.load(src, map_location=torch.device("cpu"))
+
+    # Restore the states of the model and optimizer from the dictionary.
+    model.load_state_dict(checkpoint["model_state_dict"])
+    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+
+    # This is the crucial step: return the saved iteration number.
+    # Without this line, the function returns None by default.
+    return checkpoint["iteration"]
 
 
 def get_tokenizer(
