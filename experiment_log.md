@@ -28,6 +28,17 @@ python cs336_basics/train.py \
    --max_iters 1000
 ```
 
+### Generate
+
+```bash
+python generate_text.py \
+   --vocab_path tokenizers/tinystories_10k_train/vocab.pkl \
+   --merges_path tokenizers/tinystories_10k_train/merges.pkl \
+   --d_model 256 \
+   --num_layers 4 \
+   --num_heads 4 
+```
+
 ## Experiment 1: Baseline Model
 
 *   **Description**: Train the baseline TransformerLM model with the default hyperparameters.
