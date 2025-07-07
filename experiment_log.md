@@ -10,7 +10,7 @@ First, run the following script to tokenise the text:
 python -m scripts.train_bpe_and_tokenize \
 --input_file data/TinyStoriesV2-GPT4-train.txt \
 --vocab_size 10000 \
---output_dir tokenizers/tinystories_10k
+--output_dir tokenizers/tinystories_10k_train
 ```
 
 ### Run experiment
@@ -19,8 +19,8 @@ python -m scripts.train_bpe_and_tokenize \
 python cs336_basics/train.py \
    --train_data_path data/TinyStoriesV2-GPT4-train.txt \
    --valid_data_path data/TinyStoriesV2-GPT4-valid.txt \
-   --vocab_path tokenizers/tinystories_10k/vocab.pkl \
-   --merges_path tokenizers/tinystories_10k/merges.pkl \
+   --vocab_path tokenizers/tinystories_10k_train/vocab.pkl \
+   --merges_path tokenizers/tinystories_10k_train/merges.pkl \
    --d_model 256 \
    --num_layers 4 \
    --num_heads 4 \
