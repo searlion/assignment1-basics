@@ -18,13 +18,13 @@ def cross_entropy(inputs: Float[Tensor, " batch_size vocab_size"], targets: Int[
     """
     # 1. Find the maximum logit for each example in the batch for stability.
     # The '1' in 'b 1' is equivalent to keepdim=True, which is essential for broadcasting.
-    max_logits = einops.reduce(inputs, "b v -> b 1", "max")
+    max_logits = einops.reduce(inputs, "... b v ->... b 1", "max")
 
     # 2. Compute the stable Log-Sum-Exp term.
     # Subtract the max to prevent overflow.
     stable_logits = inputs - max_logits
     # Sum the exponentiated stable logits over the vocabulary dimension.
-    sum_exp_logits = einops.reduce(torch.exp(stable_logits), "b v -> b", "sum")
+    sum_exp_logits = einops.reduce(torch.exp(stable_logits), "... b v ->... b", "sum")
     # Take the log and add the max back.
     # We must squeeze max_logits from (b, 1) to (b,) for element-wise addition.
     log_sum_exp = torch.log(sum_exp_logits) + max_logits.squeeze(dim=-1)

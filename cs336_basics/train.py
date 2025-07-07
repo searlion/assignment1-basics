@@ -81,7 +81,7 @@ def main():
         "d_ff": args.d_ff,
         "rope_theta": args.rope_theta,
     }
-    model = TransformerLM.from_config(model_config).to(args.device)
+    model = TransformerLM(**model_config).to(args.device)
 
     # Optimizer initialization
     optimizer = AdamW(
