@@ -71,7 +71,7 @@ def decode(
         prompt_tokens = torch.cat([prompt_tokens, next_token], dim=1)
 
         # Check for end-of-text token
-        if next_token.item() == tokenizer.encoder.get("<|endoftext|>"):
+        if next_token.item() == tokenizer.encoder.get(b"<|endoftext|>"):
             break
 
     # Decode the generated tokens
