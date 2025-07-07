@@ -17,8 +17,8 @@ python -m scripts.train_bpe_and_tokenize \
 
 ```bash
 python cs336_basics/train.py \
-   --train_data_path data/TinyStoriesV2-GPT4-train.txt \
-   --valid_data_path data/TinyStoriesV2-GPT4-valid.txt \
+   --train_data_path tokenizers/tinystories_10k_train/tokens.bin \
+   --valid_data_path tokenizers/tinystories_10k_valid/tokens.bin \
    --vocab_path tokenizers/tinystories_10k_train/vocab.pkl \
    --merges_path tokenizers/tinystories_10k_train/merges.pkl \
    --d_model 256 \

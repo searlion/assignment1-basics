@@ -67,45 +67,9 @@ def main():
         merges_filepath=args.merges_path,
     )
 
-    def convert_to_binary_if_needed(text_path, binary_path):
-        if not os.path.exists(binary_path):
-            print(f"Binary file not found at {binary_path}. Converting from {text_path}...")
-            
-            file_size = os.path.getsize(text_path)
-            chunk_size = 1024 * 1024  # 1MB chunks
-            
-            def process_chunk(chunk):
-                return tokenizer.encode(chunk)
-
-            with open(text_path, 'r', encoding='utf-8') as f_in, open(binary_path, 'wb') as f_out:
-                with multiprocessing.Pool() as pool:
-                    # Use a progress bar to show the progress of reading the file
-                    with tqdm(total=file_size, unit='B', unit_scale=True, desc=f"Tokenizing {os.path.basename(text_path)}") as pbar:
-                        while True:
-                            chunk = f_in.read(chunk_size)
-                            if not chunk:
-                                break
-                            
-                            # Process chunks in parallel
-                            token_ids = pool.apply(process_chunk, (chunk,))
-                            
-                            # Write the tokenized data to the binary file
-                            np.array(token_ids, dtype=np.uint16).tofile(f_out)
-                            pbar.update(len(chunk.encode('utf-8')))
-            
-            print(f"Successfully converted and saved to {binary_path}")
-
-    # Define binary data paths
-    train_binary_path = args.train_data_path + '.bin'
-    valid_binary_path = args.valid_data_path + '.bin'
-
-    # Convert text data to binary if it hasn't been done yet
-    convert_to_binary_if_needed(args.train_data_path, train_binary_path)
-    convert_to_binary_if_needed(args.valid_data_path, valid_binary_path)
-
     # Load data
-    train_data = np.memmap(train_binary_path, dtype=np.uint16, mode='r')
-    valid_data = np.memmap(valid_binary_path, dtype=np.uint16, mode='r')
+    train_data = np.memmap(args.train_data_path, dtype=np.uint16, mode='r')
+    valid_data = np.memmap(args.valid_data_path, dtype=np.uint16, mode='r')
     
     # Model initialization
     model_config = {
