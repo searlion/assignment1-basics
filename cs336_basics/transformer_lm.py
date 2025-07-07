@@ -72,6 +72,23 @@ class TransformerLM(nn.Module):
         self.ln_final = RMSNorm(d_model)
         self.lm_head = Linear(d_model, vocab_size)
 
+    def to_config(self) -> Dict:
+        """
+        Returns the configuration parameters of the model.
+
+        Returns:
+            Dict: A dictionary containing all configuration parameters.
+        """
+        return {
+            "vocab_size": self.vocab_size,
+            "context_length": self.context_length,
+            "d_model": self.d_model,
+            "num_layers": self.num_layers,
+            "num_heads": self.num_heads,
+            "d_ff": self.d_ff,
+            "rope_theta": self.rope_theta,
+        }
+
     def forward(self, in_indices: torch.Tensor) -> torch.Tensor:
         """
         Performs a forward pass of the language model.

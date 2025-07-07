@@ -42,8 +42,8 @@ def data_loader(
     # `dataset[i+1:i+1+context_length]` is the target (the next token for each token in the input).
     # `torch.from_numpy` converts each slice into a tensor.
     # `torch.stack` combines the list of 1D tensors into a single 2D tensor.
-    x = torch.stack([torch.from_numpy(dataset[i: i + context_length]) for i in ix])
-    y = torch.stack([torch.from_numpy(dataset[i + 1: i + 1 + context_length]) for i in ix])
+    x = torch.stack([torch.from_numpy(dataset[i: i + context_length].copy()) for i in ix])
+    y = torch.stack([torch.from_numpy(dataset[i + 1: i + 1 + context_length].copy()) for i in ix])
 
     # 4. Move tensors to the specified device and ensure they are LongTensors.
     # Token IDs are categorical and used for lookups, so they should be integers (long).
