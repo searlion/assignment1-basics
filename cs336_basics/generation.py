@@ -55,7 +55,7 @@ def decode(
             cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
 
             # Remove tokens with cumulative probability above the threshold
-            sorted_indices_to_remove = cumulative_probs > top_p
+            sorted_indices_to_remove = cumulative_probs > torch.tensor(top_p, device=cumulative_probs.device)
             # Shift the indices to the right to keep also the first token above the threshold
             sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
             sorted_indices_to_remove[..., 0] = 0
