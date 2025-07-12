@@ -13,7 +13,7 @@ def run_command(cmd, description):
     print(f"{'=' * 60}")
 
     try:
-        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        result = subprocess.run(cmd, check=True, capture_output=False, text=True)
         print(result.stdout)
         if result.stderr:
             print("STDERR:", result.stderr)
@@ -30,17 +30,22 @@ def main():
     parser = argparse.ArgumentParser(description="Run tokenization and training pipeline.")
 
     # Data paths
-    parser.add_argument("--input_file", type=str, required=True,
-                        help="Path to the input text file for tokenization.")
-    parser.add_argument("--vocab_path", type=str, required=True,
+    parser.add_argument("--input_train_file", type=str, default="data/TinyStoriesV2-GPT4-train.txt",
+                        help="Path to the input text file for tokenization of training data.")
+    parser.add_argument("--input_valid_file", type=str, default="data/TinyStoriesV2-GPT4-valid.txt",
+                        help="Path to the input text file for tokenization of testing data.")
+    parser.add_argument("--vocab_path", type=str, default="output/train/vocab.pkl",
                         help="Path to the vocabulary file.")
-    parser.add_argument("--merges_path", type=str, required=True,
+    parser.add_argument("--merges_path", type=str, default="output/train/merges.pkl",
                         help="Path to the merges file.")
+    parser.add_argument("--output_dir", type=str, default="output",
+                        help="Directory to save the output files (tokenized training and validation data, "
+                             "checkpoints, etc.). Defaults to 'output'.")
 
     # Output paths
-    parser.add_argument("--train_tokens_file", type=str, default="train_tokens.npy",
+    parser.add_argument("--train_tokens_file", type=str, default="output/train/tokens.bin",
                         help="Path to save tokenized training data.")
-    parser.add_argument("--valid_tokens_file", type=str, default="valid_tokens.npy",
+    parser.add_argument("--valid_tokens_file", type=str, default="output/valid/tokens.bin",
                         help="Path to save tokenized validation data.")
 
     # Training parameters (with defaults)
@@ -78,22 +83,34 @@ def main():
     os.makedirs(os.path.dirname(args.train_tokens_file) if os.path.dirname(args.train_tokens_file) else ".",
                 exist_ok=True)
 
-    # Step 1: Tokenize the dataset
+    # Step 1: Tokenize the train dataset
     if not args.skip_tokenization or not (
             os.path.exists(args.train_tokens_file) and os.path.exists(args.valid_tokens_file)):
-        print("Step 1: Tokenizing dataset...")
 
         # Tokenize training data
-        tokenize_cmd = [
-            "python", "tokenize_dataset.py",
-            "--input_file", args.input_file,
-            "--output_file", args.train_tokens_file,
-            "--vocab_path", args.vocab_path,
-            "--merges_path", args.merges_path
+        print("Step 1a: Tokenizing training dataset...")
+        tokenize_train_cmd = [
+            "python", "-m", "scripts.train_bpe_and_tokenize",
+            "--input_file", args.input_train_file,
+            "--vocab_size", str(args.vocab_size),
+            "--output_dir", args.output_dir
         ]
 
-        if not run_command(tokenize_cmd, "Tokenizing training data"):
+        if not run_command(tokenize_train_cmd, "Tokenizing training data"):
             print("Failed to tokenize training data. Exiting.")
+            sys.exit(1)
+
+        # Tokenize validation data
+        print("Step 1b: Tokenizing validation dataset...")
+        tokenize_valid_cmd = [
+            "python", "-m", "scripts.train_bpe_and_tokenize",
+            "--input_file", args.input_valid_file,
+            "--vocab_size", str(args.vocab_size),
+            "--output_dir", args.output_dir
+        ]
+
+        if not run_command(tokenize_valid_cmd, "Tokenizing training data"):
+            print("Failed to tokenize validation data. Exiting.")
             sys.exit(1)
 
         # For now, we'll use the same tokenized data for validation

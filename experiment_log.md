@@ -43,9 +43,9 @@ python generate_text.py \
 ith custom parameters
 ```bash
 uv run main.py \
-    --input_file data/text.txt \
-    --vocab_path tokenizers/vocab.json \
-    --merges_path tokenizers/merges.txt \
+    --input_file data/TinyStoriesV2-GPT4-train.txt \
+    --vocab_path tokenizers/tinystories_10k_train/vocab.pkl \
+    --merges_path tokenizers/tinystories_10k_train/merges.pkl \
     --train_tokens_file data/train_tokens.npy \
     --valid_tokens_file data/valid_tokens.npy \
     --max_iters 2000 \
@@ -56,9 +56,9 @@ Skip tokenization if already done
 
 ```bash
 uv run main.py \
-    --input_file data/text.txt \
-    --vocab_path tokenizers/vocab.json \
-    --merges_path tokenizers/merges.txt \
+    --input_file data/TinyStoriesV2-GPT4-train.txt \
+    --vocab_path tokenizers/tinystories_10k_train/vocab.pkl \
+    --merges_path tokenizers/tinystories_10k_train/merges.pkl \
     --skip_tokenization
 ```
 
