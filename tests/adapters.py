@@ -5,13 +5,12 @@ import os
 from typing import IO, Any, BinaryIO, Counter
 from collections.abc import Iterable
 
-from einops import repeat, rearrange
+from einops import rearrange
 from jaxtyping import Float, Int
 
 import numpy.typing as npt
 import torch
 from torch import Tensor
-from torch.nn import Softmax2d
 from tqdm import tqdm
 
 from cs336_basics.adamw import AdamW
@@ -31,7 +30,7 @@ from cs336_basics.tokenizer import Tokenizer
 from cs336_basics.train_bpe_helper import _process_chunk, _get_pair_stats
 from cs336_basics.transformer_block import TransformerBlock
 from cs336_basics.transformer_lm import TransformerLM
-from embedding import Embedding
+from cs336_basics.embedding import Embedding
 from tests.common import gpt2_bytes_to_unicode
 
 
