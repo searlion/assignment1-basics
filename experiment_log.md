@@ -16,7 +16,7 @@ python -m scripts.train_bpe_and_tokenize \
 ### Run experiment
 
 ```bash
-python cs336_basics/train.py \
+python -m scripts.train \
    --train_data_path tokenizers/tinystories_10k_train/tokens.bin \
    --valid_data_path tokenizers/tinystories_10k_valid/tokens.bin \
    --vocab_path tokenizers/tinystories_10k_train/vocab.pkl \
