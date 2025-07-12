@@ -67,16 +67,12 @@ def main():
     args = parser.parse_args()
 
     # Check if required files exist
-    if not os.path.exists(args.input_file):
-        print(f"Error: Input file {args.input_file} not found.")
+    if not os.path.exists(args.input_train_file):
+        print(f"Error: Input train file {args.input_train_file} not found.")
         sys.exit(1)
 
-    if not os.path.exists(args.vocab_path):
-        print(f"Error: Vocabulary file {args.vocab_path} not found.")
-        sys.exit(1)
-
-    if not os.path.exists(args.merges_path):
-        print(f"Error: Merges file {args.merges_path} not found.")
+    if not os.path.exists(args.input_valid_file):
+        print(f"Error: Input valid file {args.input_valid_file} not found.")
         sys.exit(1)
 
     # Create output directory if it doesn't exist
@@ -98,6 +94,8 @@ def main():
         if not run_command(tokenize_train_cmd, "Tokenizing training data"):
             print("Failed to tokenize training data. Exiting.")
             sys.exit(1)
+    else:
+        print("Skipping training data tokenization - token files already exist.")
 
     if not args.skip_tokenization or not os.path.exists(args.valid_tokens_file):
         # Tokenize validation data
@@ -108,9 +106,11 @@ def main():
             "--vocab_size", str(args.vocab_size),
             "--output_dir", args.output_dir + "/valid"
         ]
-
+        if not run_command(tokenize_valid_cmd, "Tokenizing validation data"):
+            print("Failed to tokenize validation data. Exiting.")
+            sys.exit(1)
     else:
-        print("Skipping tokenization - token files already exist.")
+        print("Skipping validation data tokenization - token files already exist.")
 
     # Step 2: Train the model
     print("\nStep 2: Training the model...")
